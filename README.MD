@@ -1,0 +1,1 @@
+An express app with a database access, serving data as RESTful apis.
