@@ -1,36 +1,16 @@
 import pool from '../config/db.js';
 import Game from '../models/Game.js';
 
-const fetchGameList = async() => {
-    const result = await pool.query('SELECT * FROM games');
-    return result;
-}
+const fetchGameList = async() => await pool.query('SELECT * FROM games');
+const fetchGameByID = async(id: number) => await pool.query('SELECT * FROM games WHERE id=$1', [id]);
 
-const fetchGameByID = async(id: number) => {
-    const result = await pool.query('SELECT * FROM games WHERE id=$1', [id]);
-    return result;
-}
+// ranking is determined as a percentage compared with the total amount of entries in a competition (10th place of 10 entries is very different than 10th place of 1000 entries)
+const fetchGameByRanking = async(ascending: boolean) => await pool.query(`SELECT * FROM games ORDER BY ranking::float / total_entries ${ascending ? 'ASC' : 'DESC'}`);
+const fetchGameByDate = async(recent: boolean) => await pool.query(`SELECT * FROM games ORDER BY date_submitted ${recent ? 'DESC' : 'ASC'}`);
+const fetchGameByJam = async(jam:string) => await pool.query('SELECT * FROM games WHERE jam=$1', [jam]);
+const fetchGameByType = async(type: string) => await pool.query('SELECT * FROM games WHERE project=$1', [type]);
 
-const fetchGameByRanking = async(ascending: boolean) => {
-    const result = await pool.query(`SELECT * FROM games ORDER BY ranking::float / total_entries ${ascending ? 'ASC' : 'DESC'}`);
-    return result;
-}
-
-const fetchGameByDate = async(recent: boolean) => {
-    const result = await pool.query(`SELECT * FROM games ORDER BY date_submitted ${recent ? 'DESC' : 'ASC'}`);
-    return result;
-}
-
-const fetchGameByJam = async(jam:string) => {
-    const result = await pool.query('SELECT * FROM games WHERE jam=$1', [jam]);
-    return result;
-}
-
-const fetchGameByType = async(type: string) => {
-    const result = await pool.query('SELECT * FROM games WHERE project=$1', [type]);
-    return result;
-}
-
+// there are many optional columns in the game table, we must add these values dynamically, whilst still using parameterized queries for safety
 const addGame = async(game: Game) => {
 
     const optional = {
