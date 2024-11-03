@@ -1,6 +1,8 @@
 import gameService from '../services/game-service.js';
 import {Request, Response} from 'express';
-import RESPONSES from '../utils/responses.js';
+import Game from '../models/Game.js';
+import { EntryDate, Ranking } from '../models/GameEnums.js';
+import handleServerError, {handleBadRequest, handleNotFound} from '../utils/error-handling.js';
 
 
 const fetchGameList = async(req: Request, res: Response) =>  {
@@ -8,16 +10,15 @@ const fetchGameList = async(req: Request, res: Response) =>  {
         const result = await gameService.fetchGameList();
         res.status(200).json(result.rows);
     } catch (err){
-        console.error(err);
-        res.status(500).json(RESPONSES.ERROR);
+        handleServerError(err, res);
     }
 }
 
-const fetchGameByID = async(req: Request, res: Response) => {
-    const id = parseInt(req.params.id, 10);
+const fetchGameByID = async(req: Request, res: Response, next: Function, paramsId: string) => {
+    const id = parseInt(paramsId, 10);
 
     if(isNaN(id)){
-        res.status(400).json({ error: 'Invalid game ID format'});
+        handleBadRequest(res, 'Invalid game ID format');
         return;
     }
 
@@ -25,35 +26,34 @@ const fetchGameByID = async(req: Request, res: Response) => {
         const result = await gameService.fetchGameByID(id);
 
         if(result.rowCount === 0){
-            res.status(404).json({ error: 'Game not found' });
+            handleNotFound(res, 'Game');
             return;
         }
 
-        res.status(200).send(result.rows);
+       req.game = result.rows[0];
+       next();
 
     } catch (err) {
-        console.error(err);
-        res.status(500).json(RESPONSES.ERROR);
+        handleServerError(err, res);
     }
 }
 
 const fetchGameByRanking = async(req: Request, res: Response) => {
 
-    const order = req.params.order.toUpperCase();
+    const order = req.params.order.toUpperCase() as Ranking;
 
-    if(order !== 'ASC' && order !== 'DESC'){
-        res.status(400).json({error: 'Bad request: Value must be ASC or DESC'});
+    if(!(order in Ranking)){
+        handleBadRequest(res, `Value must be ${Ranking.BEST} or ${Ranking.WORST}`)
         return;
     }
 
-    const best = order === 'ASC' ? true : false;
+    const best = order === Ranking.BEST;
 
     try {
         const result = await gameService.fetchGameByRanking(best);
         res.status(200).json(result.rows);
     } catch (err) {
-        console.error(err);
-        res.status(500).json(RESPONSES.ERROR);
+        handleServerError(err, res);
     }
 
 }
@@ -61,21 +61,20 @@ const fetchGameByRanking = async(req: Request, res: Response) => {
 
 const fetchGameByDate = async(req: Request, res: Response) => {
    
-    const date = req.params.date.toUpperCase();
+    const date = req.params.date.toUpperCase() as EntryDate;
 
-    if(date !== 'NEW' && date !== 'OLD'){
-        res.status(400).json({error: 'Bad Request. Value must be new or old.'});
+    if(!(date in EntryDate)){
+        handleBadRequest(res, `Value must be ${EntryDate.NEW} or ${EntryDate.OLD}`)
         return;
     }
 
-    const recent = date === 'NEW' ? true : false;
+    const recent = date === EntryDate.NEW;
 
     try {
         const result = await gameService.fetchGameByDate(recent);
         res.status(200).json(result.rows);
     } catch (err) {
-        console.error(err);
-        res.status(500).json(RESPONSES.ERROR);
+        handleServerError(err, res);
     }
 }
 
@@ -85,14 +84,13 @@ const fetchGameByJam = async(req: Request, res: Response) => {
         const result = await gameService.fetchGameByJam(req.params.jam);
 
         if(result.rowCount === 0){
-            res.status(404).json({ error: 'Jam not found'});
+            handleNotFound(res, 'Jam');
             return;
         }
 
         res.status(200).json(result.rows);
     } catch (err){
-        console.error(err);
-        res.status(500).json(RESPONSES.ERROR);
+        handleServerError(err, res);
     }
 }
 
@@ -101,14 +99,51 @@ const fetchGameByType = async(req: Request, res: Response) => {
         const result = await gameService.fetchGameByType(req.params.type);
 
         if(result.rowCount === 0){
-            res.status(404).json({ error: 'No such game type'})
+            handleNotFound(res, 'Game type');
             return;
         }
         res.status(200).json(result.rows);
     } catch (err){
-        console.error(err);
-        res.status(500).json(RESPONSES.ERROR);
+        handleServerError(err, res);
     }
+}
+
+const getGame = (req: Request, res: Response) => {
+   
+
+    try {
+        const result = req.game; 
+        res.status(200).send(result);
+    } catch (err) {
+        handleServerError(err, res);
+    }
+}
+
+const addGame = async(req: Request, res: Response) => {
+    const game: Partial<Game> = req.body;
+
+    //checking for non-optional properties
+    if(!game.title || !game.project || !game.date_submitted){
+        handleBadRequest(res, 'Missing non-option properties title, project or date_submitted');
+        return;
+    }
+
+    try {
+        const result = await gameService.addGame(game as Game);
+        res.status(201).json(result.rows);
+    } catch (err) {
+        handleServerError(err, res);
+    }
+}
+
+const editGame = async(req: Request, res: Response) => {
+    console.log('editing');
+    console.log(req.game)
+}
+
+const deleteGame = async(req: Request, res: Response) => {
+    console.log('deleting game');
+    console.log(req.game)
 }
 
 export default {
@@ -117,6 +152,10 @@ export default {
     fetchGameByRanking,
     fetchGameByDate,
     fetchGameByJam,
-    fetchGameByType
+    fetchGameByType,
+    getGame,
+    addGame,
+    editGame,
+    deleteGame
 }
 

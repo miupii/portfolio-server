@@ -1,4 +1,5 @@
 import pool from '../config/db.js';
+import Game from '../models/Game.js';
 
 const fetchGameList = async() => {
     const result = await pool.query('SELECT * FROM games');
@@ -26,7 +27,33 @@ const fetchGameByJam = async(jam:string) => {
 }
 
 const fetchGameByType = async(type: string) => {
-    const result = pool.query('SELECT * FROM games WHERE project=$1', [type]);
+    const result = await pool.query('SELECT * FROM games WHERE project=$1', [type]);
+    return result;
+}
+
+const addGame = async(game: Game) => {
+
+    const optional = {
+        jam: game.jam ?? null,
+        ranking: game.ranking ?? null,
+        total_entries: game.total_entries ?? null,
+        engine: game.engine ?? null
+    }
+
+    const parameters: string[] = ['$1', '$2', '$3'];
+    const values: (string | number | Date)[] = [game.title, game.project, game.date_submitted];
+    const columns: string[] = ['title', 'project', 'date_submitted'];
+
+    Object.entries(optional).forEach(([key, value]) => {
+        if(value !== null){
+            parameters.push('$' + (parameters.length + 1))
+            values.push(value);
+            columns.push(key);
+        }
+    });
+
+    const querySTR = `INSERT INTO games(${columns.join(', ')}) VALUES(${parameters.join(', ')})`;
+    const result = await pool.query(querySTR, values);
     return result;
 }
 
@@ -36,5 +63,6 @@ export default {
     fetchGameByRanking,
     fetchGameByDate,
     fetchGameByJam,
-    fetchGameByType
+    fetchGameByType,
+    addGame
 }
